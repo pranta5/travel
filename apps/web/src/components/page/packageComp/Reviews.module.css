@@ -1,0 +1,30 @@
+/* Position the pagination centered under the slider */
+.custom-pagination {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 10px; /* adjust distance from cards */
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Bullet default look */
+.custom-bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #cbd5e1; /* light gray */
+  opacity: 1; /* ensure visible */
+  margin: 0; /* spacing handled by gap */
+  transition: transform 150ms ease, background 150ms ease;
+  cursor: pointer;
+}
+
+/* Active bullet */
+.custom-bullet-active {
+  background: #06b6d4; /* teal (change to your color) */
+  transform: scale(1.25);
+}

@@ -1,0 +1,6 @@
+.env
+# Temp uploads (before Cloudinary)
+uploads/temp/
+uploads/temp/**
+node_modules
+.env*
