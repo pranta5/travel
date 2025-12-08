@@ -1,35 +1,28 @@
-// hooks/usePackages.ts
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import type { IPackage, ApiResponse } from "../app/types/package";
 
-export interface Package {
-  _id: string;
-  title: string;
-  slug: string;
-  featuredImage: string;
-  overview: string;
-  destination?: string[]; // ← it's an array!
-  categoryAndPrice?: { category: string; price: number }[];
-  isActive: boolean;
-}
+export const usePackages = (opts?: {
+  page?: number;
+  limit?: number;
+  destination?: string;
+  category?: string;
+}) => {
+  const { page = 1, limit = 10, destination, category } = opts ?? {};
 
-export const usePackages = (searchQuery?: string, destinationKey?: string) => {
-  return useQuery<Package[]>({
-    queryKey: ["packages", searchQuery, destinationKey],
+  return useQuery<IPackage[], Error>({
+    queryKey: ["packages", page, limit, destination ?? null, category ?? null],
     queryFn: async () => {
       const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      if (destination) params.set("destination", destination);
+      if (category) params.set("category", category);
 
-      if (searchQuery) {
-        params.set("search", searchQuery);
-      }
-      if (destinationKey && destinationKey !== "explore") {
-        params.set("destination", destinationKey); // e.g., "Manali"
-      }
-
-      const res = await api.get(`/packages?${params.toString()}`);
+      const q = params.toString() ? `?${params.toString()}` : "";
+      const res = await api.get<ApiResponse<IPackage[]>>(`/packages${q}`);
       return res.data.data || [];
     },
-    staleTime: 1000 * 60 * 5, // 5 mins cache
-    retry: 2,
+    staleTime: 1000 * 60 * 5,
   });
 };

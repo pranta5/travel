@@ -11,11 +11,12 @@ if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
   process.exit(1);
 }
 
-const ACCESS_TOKEN_EXPIRES = "60m";
-const REFRESH_TOKEN_EXPIRES = "7d";
+const ACCESS_TOKEN_EXPIRES = env.ACCESS_TOKEN_MAX_AGE;
+const REFRESH_TOKEN_EXPIRES = env.REFRESH_TOKEN_MAX_AGE;
 
 export interface TokenPayload extends JwtPayload {
   userId: string;
+  name: string;
   role: string;
   email?: string;
 }

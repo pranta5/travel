@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  UseQueryOptions,
+} from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
-import "react-datepicker/dist/react-datepicker.css";
 import api from "@/lib/axios";
 
 type BookingStatus =
@@ -20,6 +24,7 @@ type Booking = {
   _id: string;
   bookingId: string;
   bookingDate: string;
+  travelDate: string;
   totalAmount: number;
   paidAmount: number;
   bookingStatus: BookingStatus;
@@ -30,9 +35,10 @@ type Booking = {
     phone?: string;
   };
   package: {
+    _id?: string;
     title: string;
+    availableDates?: string[]; // ISO strings
   };
-  message?: string;
 };
 
 type Pagination = {
@@ -42,16 +48,21 @@ type Pagination = {
   pages: number;
 };
 
+/** Package API shape (we fetch only availableDates when needed) */
+type PackageAPI = {
+  _id: string;
+  title: string;
+  availableDates?: string[]; // ISO strings
+};
+
 export default function ManageBookingDesign() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [paymentFilter, setPaymentFilter] = useState("All");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [selectedMessage, setSelectedMessage] = useState<{
-    message: string;
-    name: string;
-  } | null>(null);
+
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [paymentModal, setPaymentModal] = useState<{
     open: boolean;
     bookingId?: string;
@@ -68,6 +79,7 @@ export default function ManageBookingDesign() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // build query params string (will be captured in queryFn)
   const queryParams = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
@@ -76,23 +88,31 @@ export default function ManageBookingDesign() {
     ...(paymentFilter !== "All" && { paymentStatus: paymentFilter }),
   });
 
+  // === Important: single canonical queryKey used everywhere ===
+  const bookingsQueryKey = [
+    "bookings",
+    page,
+    limit,
+    debouncedSearch,
+    statusFilter,
+    paymentFilter,
+  ];
+
+  // Fetch bookings (list)
   const {
     data: response,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: [
-      "bookings",
-      page,
-      limit,
-      debouncedSearch,
-      statusFilter,
-      paymentFilter,
-    ],
+    queryKey: bookingsQueryKey,
     queryFn: async () => {
       const { data } = await api.get(`/booking?${queryParams}`);
       return data;
     },
+    staleTime: 0,
+    // refetchInterval: 5000,
+    placeholderData: "previous",
+    refetchOnWindowFocus: true,
   });
 
   const bookings: Booking[] = response?.data || [];
@@ -103,134 +123,9 @@ export default function ManageBookingDesign() {
     pages: 1,
   };
 
-  const updateBookingStatus = useMutation({
-    mutationFn: ({
-      id,
-      bookingStatus,
-    }: {
-      id: string;
-      bookingStatus: string;
-    }) => api.patch(`/booking/${id}/status`, { bookingStatus }),
-
-    onMutate: async ({ id, bookingStatus }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["bookings"] });
-
-      // Snapshot previous value
-      const previousBookings = queryClient.getQueryData(["bookings"]) || {};
-
-      // Optimistically update
-      queryClient.setQueryData(
-        ["bookings", page, limit, debouncedSearch, statusFilter, paymentFilter],
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((b: Booking) =>
-              b._id === id ? { ...b, bookingStatus } : b
-            ),
-          };
-        }
-      );
-
-      return { previousBookings };
-    },
-
-    onError: (err, variables, context) => {
-      toast.error("Failed to update status");
-      // Rollback on error
-      queryClient.setQueryData(["bookings"], context?.previousBookings);
-    },
-
-    onSettled: () => {
-      // Always refetch to ensure data consistency (optional but safe)
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
-    },
-
-    onSuccess: () => toast.success("Booking status updated!"),
-  });
-
-  const updatePaymentStatus = useMutation({
-    mutationFn: ({
-      id,
-      paymentStatus,
-    }: {
-      id: string;
-      paymentStatus: string;
-    }) => api.patch(`/booking/${id}/payment`, { paymentStatus }),
-    onSuccess: () => {
-      toast.success("Payment status updated!");
-      queryClient.invalidateQueries({
-        queryKey: ["bookings"],
-        refetchType: "active",
-      });
-    },
-    onError: (err: any) =>
-      toast.error(err.response?.data?.error || "Update failed"),
-  });
-
-  const updatePaymentWithAmount = useMutation({
-    mutationFn: ({
-      id,
-      paymentStatus,
-      paidAmount,
-    }: {
-      id: string;
-      paymentStatus: string;
-      paidAmount?: number;
-    }) => api.patch(`/booking/${id}/payment`, { paymentStatus, paidAmount }),
-
-    onMutate: async ({ id, paymentStatus, paidAmount }) => {
-      await queryClient.cancelQueries({ queryKey: ["bookings"] });
-
-      const previous = queryClient.getQueryData([
-        "bookings",
-        page,
-        limit,
-        debouncedSearch,
-        statusFilter,
-        paymentFilter,
-      ]);
-
-      queryClient.setQueryData(
-        ["bookings", page, limit, debouncedSearch, statusFilter, paymentFilter],
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((b: Booking) =>
-              b._id === id
-                ? {
-                    ...b,
-                    paymentStatus,
-                    paidAmount:
-                      paidAmount !== undefined ? paidAmount : b.paidAmount,
-                  }
-                : b
-            ),
-          };
-        }
-      );
-
-      return { previous };
-    },
-
-    onError: (err, variables, context) => {
-      toast.error("Failed to update payment");
-      queryClient.setQueryData(["bookings"], context?.previous);
-    },
-
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
-    },
-
-    onSuccess: () => {
-      toast.success("Payment updated successfully!");
-      setPaymentModal({ open: false });
-    },
-  });
-
-  const formatDate = (date: string) => format(new Date(date), "dd MMM yyyy");
+  // Formatting helpers
+  const formatDate = (date?: string) =>
+    date ? format(new Date(date), "dd MMM yyyy") : "-";
   const formatAmount = (amount: number) => `₹${amount.toLocaleString("en-IN")}`;
 
   const totalPages = pagination.pages;
@@ -238,7 +133,7 @@ export default function ManageBookingDesign() {
 
   const getVisiblePages = () => {
     const delta = 2;
-    const range = [];
+    const range: (number | string)[] = [];
     for (
       let i = Math.max(2, currentPage - delta);
       i <= Math.min(totalPages - 1, currentPage + delta);
@@ -252,6 +147,239 @@ export default function ManageBookingDesign() {
     return range;
   };
 
+  // --------- Mutations ----------
+
+  // 1) Update Booking Status (optimistic + exact invalidation)
+  const updateBookingStatus = useMutation({
+    mutationFn: ({
+      id,
+      bookingStatus,
+    }: {
+      id: string;
+      bookingStatus: string;
+    }) => api.patch(`/booking/${id}`, { bookingStatus }),
+
+    onMutate: async ({ id, bookingStatus }) => {
+      await queryClient.cancelQueries({ queryKey: bookingsQueryKey });
+      const previous = queryClient.getQueryData(bookingsQueryKey);
+
+      queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+        if (!old) return old;
+        if (!old.data) return old;
+        return {
+          ...old,
+          data: old.data.map((b: Booking) =>
+            b._id === id ? { ...b, bookingStatus } : b
+          ),
+        };
+      });
+
+      return { previous };
+    },
+
+    onError: (err, variables, context: any) => {
+      toast.error("Failed to update status");
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(bookingsQueryKey, context.previous);
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: bookingsQueryKey,
+          exact: true,
+        });
+      }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    },
+
+    onSuccess: (res) => {
+      // If API returns updated booking, update cache directly
+      const updatedBooking = res?.data;
+      if (updatedBooking) {
+        queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((b: Booking) =>
+              b._id === updatedBooking._id ? updatedBooking : b
+            ),
+          };
+        });
+      }
+      toast.success("Booking status updated!");
+    },
+  });
+
+  // 2) Update payment status (no optimistic update, refetch exact)
+  const updatePaymentStatus = useMutation({
+    mutationFn: ({
+      id,
+      paymentStatus,
+    }: {
+      id: string;
+      paymentStatus: string;
+    }) => api.patch(`/booking/${id}`, { paymentStatus }),
+    onSuccess: async (res) => {
+      // if res contains updated booking, update cache; otherwise refetch exact key
+      const updatedBooking = res?.data;
+      if (updatedBooking) {
+        queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((b: Booking) =>
+              b._id === updatedBooking._id ? updatedBooking : b
+            ),
+          };
+        });
+      } else {
+        await queryClient.invalidateQueries({
+          queryKey: bookingsQueryKey,
+          exact: true,
+        });
+      }
+      toast.success("Payment status updated!");
+    },
+    onError: (err: any) =>
+      toast.error(err.response?.data?.error || "Update failed"),
+  });
+
+  // 3) update payment with amount (optimistic)
+  const updatePaymentWithAmount = useMutation({
+    mutationFn: ({
+      id,
+      paymentStatus,
+      paidAmount,
+    }: {
+      id: string;
+      paymentStatus: string;
+      paidAmount?: number;
+    }) => api.patch(`/booking/${id}`, { paymentStatus, paidAmount }),
+
+    onMutate: async ({ id, paymentStatus, paidAmount }) => {
+      await queryClient.cancelQueries({ queryKey: bookingsQueryKey });
+      const previous = queryClient.getQueryData(bookingsQueryKey);
+
+      queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((b: Booking) =>
+            b._id === id
+              ? {
+                  ...b,
+                  paymentStatus,
+                  paidAmount:
+                    paidAmount !== undefined ? paidAmount : b.paidAmount,
+                }
+              : b
+          ),
+        };
+      });
+
+      return { previous };
+    },
+
+    onError: (err, variables, context: any) => {
+      toast.error("Failed to update payment");
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(bookingsQueryKey, context.previous);
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: bookingsQueryKey,
+          exact: true,
+        });
+      }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    },
+
+    onSuccess: (res) => {
+      const updatedBooking = res?.data;
+      if (updatedBooking) {
+        queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((b: Booking) =>
+              b._id === updatedBooking._id ? updatedBooking : b
+            ),
+          };
+        });
+      }
+      toast.success("Payment updated successfully!");
+      setPaymentModal({ open: false });
+    },
+  });
+
+  // 4) update travel date (optimistic)
+  const updateTravelDate = useMutation({
+    mutationFn: ({ id, travelDate }: { id: string; travelDate: string }) =>
+      api.patch(`/booking/${id}`, { travelDate }),
+    onMutate: async ({ id, travelDate }) => {
+      await queryClient.cancelQueries({ queryKey: bookingsQueryKey });
+      const previous = queryClient.getQueryData(bookingsQueryKey);
+
+      queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((b: Booking) =>
+            b._id === id ? { ...b, travelDate } : b
+          ),
+        };
+      });
+
+      return { previous };
+    },
+    onError: (err, variables, context: any) => {
+      toast.error("Failed to update travel date");
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(bookingsQueryKey, context.previous);
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: bookingsQueryKey,
+          exact: true,
+        });
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    },
+    onSuccess: (res) => {
+      const updatedBooking = res?.data;
+      if (updatedBooking) {
+        queryClient.setQueryData(bookingsQueryKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((b: Booking) =>
+              b._id === updatedBooking._id ? updatedBooking : b
+            ),
+          };
+        });
+      }
+      toast.success("Travel date updated");
+      setSelectedBooking(null);
+    },
+  });
+
+  // ------------- Fetch package when modal opens -------------
+  const packageQuery = useQuery<PackageAPI, Error>({
+    queryKey: ["package", selectedBooking?.package._id],
+    enabled: Boolean(selectedBooking?.package._id),
+    queryFn: async () => {
+      const pkgId = selectedBooking!.package._id!;
+      const res = await api.get(`/packages/single/${pkgId}`);
+      return res.data.data as PackageAPI;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // ------------ Render ------------
   return (
     <div className="p-6 text-gray-700">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Bookings</h1>
@@ -259,7 +387,7 @@ export default function ManageBookingDesign() {
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input
+          {/* <input
             placeholder="Search user or package..."
             value={search}
             onChange={(e) => {
@@ -267,7 +395,7 @@ export default function ManageBookingDesign() {
               setPage(1);
             }}
             className="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
+          /> */}
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -327,7 +455,7 @@ export default function ManageBookingDesign() {
                     <th className="px-4 py-3 text-left">Amount</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-left">Payment</th>
-                    <th className="px-4 py-3 text-left">Message</th>
+                    <th className="px-4 py-3 text-left">Date</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -344,7 +472,8 @@ export default function ManageBookingDesign() {
                     bookings.map((booking) => (
                       <tr
                         key={booking._id}
-                        className="border-b hover:bg-gray-50"
+                        className="border-b hover:bg-gray-50 cursor-pointer"
+                        onClick={() => setSelectedBooking(booking)}
                       >
                         <td className="px-4 py-3 font-medium">
                           #{booking.bookingId}
@@ -397,6 +526,8 @@ export default function ManageBookingDesign() {
                                 ? "bg-red-100 text-red-800"
                                 : "bg-gray-100 text-gray-800"
                             }`}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={updateBookingStatus.isPending}
                           >
                             <option value="pending">Pending</option>
                             <option value="confirmed">Confirmed</option>
@@ -412,12 +543,10 @@ export default function ManageBookingDesign() {
                             value={booking.paymentStatus}
                             onChange={(e) => {
                               const newStatus = e.target.value as PaymentStatus;
-
                               if (
                                 newStatus === "paid" &&
                                 booking.paymentStatus !== "paid"
                               ) {
-                                // Open modal to input amount
                                 setPaymentModal({
                                   open: true,
                                   bookingId: booking._id,
@@ -425,7 +554,6 @@ export default function ManageBookingDesign() {
                                   currentPaidAmount: booking.paidAmount,
                                 });
                               } else {
-                                // For other statuses (failed, refunded, pending), update directly
                                 updatePaymentStatus.mutate({
                                   id: booking._id,
                                   paymentStatus: newStatus,
@@ -441,6 +569,8 @@ export default function ManageBookingDesign() {
                                 ? "bg-red-100 text-red-800"
                                 : "bg-gray-100"
                             }`}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={updatePaymentStatus.isPending}
                           >
                             <option value="pending">Pending</option>
                             <option value="paid">Paid</option>
@@ -449,22 +579,32 @@ export default function ManageBookingDesign() {
                           </select>
                         </td>
 
-                        {/* Message */}
+                        {/* Travel Date */}
                         <td className="px-4 py-3">
-                          {booking.message ? (
-                            <button
-                              onClick={() =>
-                                setSelectedMessage({
-                                  message: booking.message!,
-                                  name: booking.user.name,
+                          {booking.package.availableDates &&
+                          booking.package.availableDates.length > 0 ? (
+                            <select
+                              value={booking.travelDate}
+                              onChange={(e) =>
+                                updateTravelDate.mutate({
+                                  id: booking._id,
+                                  travelDate: e.target.value,
                                 })
                               }
-                              className="text-teal-600 hover:text-teal-800 underline text-sm"
+                              className="border rounded px-4 py-2 text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                              disabled={updateTravelDate.isPending}
                             >
-                              View Message
-                            </button>
+                              {booking.package.availableDates.map((iso) => (
+                                <option key={iso} value={iso}>
+                                  {format(new Date(iso), "dd MMM yyyy")}
+                                </option>
+                              ))}
+                            </select>
                           ) : (
-                            <span className="text-gray-400 italic">—</span>
+                            <span className="text-gray-400 italic">
+                              No dates
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -549,37 +689,7 @@ export default function ManageBookingDesign() {
         </>
       )}
 
-      {/* Message Modal */}
-      {selectedMessage && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedMessage(null)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 border-b">
-              <h3 className="text-xl font-bold text-gray-800">
-                Message from {selectedMessage.name}
-              </h3>
-            </div>
-            <div className="p-6">
-              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-lg">
-                {selectedMessage.message}
-              </p>
-            </div>
-            <div className="p-6 border-t bg-gray-50 flex justify-end">
-              <button
-                onClick={() => setSelectedMessage(null)}
-                className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Payment Modal */}
       {paymentModal.open && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
@@ -629,12 +739,10 @@ export default function ManageBookingDesign() {
                     "paid-amount-input"
                   ) as HTMLInputElement;
                   const amount = Number(input.value);
-
                   if (isNaN(amount) || amount < 0) {
                     toast.error("Please enter a valid amount");
                     return;
                   }
-
                   updatePaymentWithAmount.mutate({
                     id: paymentModal.bookingId!,
                     paymentStatus: "paid",
@@ -642,8 +750,108 @@ export default function ManageBookingDesign() {
                   });
                 }}
                 className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition"
+                disabled={updatePaymentWithAmount.isPending}
               >
                 Confirm Paid
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Booking Details Modal (change travelDate here) ---------- */}
+      {selectedBooking && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedBooking(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-screen overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-800">
+                Booking Details — #{selectedBooking.bookingId}
+              </h3>
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="text-sm text-gray-500"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm text-gray-500">Customer</div>
+                  <div className="font-medium">{selectedBooking.user.name}</div>
+                  <div className="text-xs text-gray-500">
+                    Mail - {selectedBooking.user.email}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Ph - {selectedBooking.user.phone}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500">Package</div>
+                  <div className="font-medium">
+                    {selectedBooking.package.title}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500">Booking Date</div>
+                  <div className="font-medium">
+                    {formatDate(selectedBooking.bookingDate)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500">
+                    Current Travel Date
+                  </div>
+                  <div className="font-medium">
+                    {formatDate(selectedBooking.travelDate)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500">Amount</div>
+                  <div className="font-medium">
+                    {formatAmount(selectedBooking.totalAmount)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500">Payment Status</div>
+                  <div className="font-medium capitalize">
+                    {selectedBooking.paymentStatus}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="px-5 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  // Refetch bookings to ensure latest
+                  queryClient.invalidateQueries({
+                    queryKey: bookingsQueryKey,
+                    exact: true,
+                  });
+                  setSelectedBooking(null);
+                }}
+                className="px-5 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+              >
+                Refresh
               </button>
             </div>
           </div>

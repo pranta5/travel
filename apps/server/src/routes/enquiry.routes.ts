@@ -13,7 +13,11 @@ const router = Router();
 router.post("/", createEnquiry);
 
 // Admin only
-router.get("/", requireAuth(["admin", "manager"]), getAllEnquiries);
-router.patch("/:id", requireAuth(["admin", "manager"]), updateEnquiry);
+router.get("/", requireAuth(["admin", "manager", "employee"]), getAllEnquiries);
+router.patch(
+  "/:id",
+  requireAuth(["admin", "manager", "employee"]),
+  updateEnquiry
+);
 
 export default router;

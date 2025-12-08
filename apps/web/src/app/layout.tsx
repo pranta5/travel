@@ -3,8 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "react-toastify/dist/ReactToastify.css";
 
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastContainer } from "react-toastify";
 
@@ -35,9 +33,7 @@ export default function RootLayout({
       >
         <QueryProvider>
           <AuthProvider>
-            <Navbar />
             {children}
-            <Footer />
             <ToastContainer
               position="top-right"
               autoClose={3000}

@@ -16,20 +16,14 @@ export const createBookingSchema = Joi.object({
     "any.required": "Number of travelers is required",
   }),
 
-  travelDate: Joi.date().min("now").required().messages({
-    "date.min": "Travel date cannot be in the past",
-    "any.required": "Travel date is required",
-  }),
+  travelDate: Joi.date().iso().min("now").required(),
   category: Joi.string()
-    .valid("standard", "deluxe", "super deluxe")
+    .valid("standard", "deluxe", "superdeluxe")
     .required()
     .messages({
       "any.required": "Please select a category (standard, deluxe, etc.)",
       "any.only": "Invalid category selected",
     }),
-});
-
-export const updatePaymentStatusSchema = Joi.object({
   paymentStatus: Joi.string()
     .valid("pending", "paid", "failed", "refunded")
     .required(),
@@ -38,9 +32,6 @@ export const updatePaymentStatusSchema = Joi.object({
     then: Joi.number().positive().required(),
     otherwise: Joi.forbidden(),
   }),
-});
-
-export const updateBookingStatusSchema = Joi.object({
   bookingStatus: Joi.string()
     .valid("pending", "confirmed", "reschedule", "cancelled", "complete")
     .required(),

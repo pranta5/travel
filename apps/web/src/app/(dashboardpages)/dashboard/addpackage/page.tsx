@@ -1,4 +1,3 @@
-// app/dashboard/addpackage/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -9,7 +8,7 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
 type ItineraryItem = {
-  day?: string; // backend example uses "day": "Day 1"
+  day?: string;
   description: string;
 };
 
@@ -20,19 +19,21 @@ type ActivityItem = {
 
 type CategoryPrice = {
   category: string;
-  price: string; // keep as string in form, convert to number when sending
+  price: string;
 };
 
 type FormValues = {
   title: string;
   overview: string;
-  // destinations entered as comma-separated string (we'll split to array)
   destinations: string;
-  // hotels?: string;
   featuredImage?: File | null;
   itinerary: ItineraryItem[];
   activities: ActivityItem[];
   categoryAndPrice: CategoryPrice[];
+  availableDates: string[];
+  groupStart?: string;
+  travelStart?: string;
+  travelEnd?: string;
 };
 
 export default function AddPackageForm() {
@@ -43,6 +44,7 @@ export default function AddPackageForm() {
     handleSubmit,
     watch,
     setValue,
+    getValues,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -50,13 +52,26 @@ export default function AddPackageForm() {
       title: "",
       overview: "",
       destinations: "",
-      // hotels: "",
       featuredImage: undefined,
       itinerary: [{ day: "Day 1", description: "" }],
       activities: [{ activityName: "", image: undefined }],
       categoryAndPrice: [{ category: "standard", price: "" }],
+      availableDates: [],
+      groupStart: "",
+      travelStart: "",
+      travelEnd: "",
     },
   });
+
+  // availableDates field array
+  const {
+    fields: availableDateFields,
+    append: appendAvailableDate,
+    remove: removeAvailableDate,
+  } = useFieldArray({
+    control,
+    name: "availableDates",
+  } as any);
 
   // Itinerary array
   const {
@@ -92,6 +107,10 @@ export default function AddPackageForm() {
   const featuredFile = watch("featuredImage");
   const activities = watch("activities");
   const categoryAndPrice = watch("categoryAndPrice");
+  const travelStart = watch("travelStart");
+  const travelEnd = watch("travelEnd");
+  const groupStart = watch("groupStart");
+  const availableDates = watch("availableDates");
 
   // Previews
   const featuredPreview = useMemo(() => {
@@ -105,7 +124,6 @@ export default function AddPackageForm() {
     () => activityFields.map(() => null)
   );
 
-  // keep activityPreviews length in sync
   useEffect(() => {
     setActivityPreviews((prev) => {
       const next = [...prev];
@@ -163,22 +181,48 @@ export default function AddPackageForm() {
     setValue(fieldName, file, { shouldDirty: true, shouldValidate: true });
   }
 
+  // Add groupStart into availableDates
+  function handleAddGroupStartDate() {
+    const val = getValues("groupStart")?.trim();
+    if (!val) {
+      toast.error("Please pick a date to add");
+      return;
+    }
+    // prevent duplicates
+    const exists = (getValues("availableDates") || []).includes(val);
+    if (exists) {
+      toast.error("Date already added");
+      return;
+    }
+    appendAvailableDate(val);
+    // clear groupStart input
+    setValue("groupStart", "");
+  }
+
   // Submit
   const onSubmit = async (data: FormValues) => {
     try {
+      // basic validation for travelStart/travelEnd if used
+      if (data.travelStart && data.travelEnd) {
+        const s = new Date(data.travelStart);
+        const e = new Date(data.travelEnd);
+        if (e < s) {
+          toast.error("End date cannot be before start date");
+          return;
+        }
+      }
+
       // Build FormData
       const formData = new FormData();
 
       // Basic fields
       formData.append("title", data.title);
       formData.append("overview", data.overview || "");
-      // destination: send as JSON array
       const destArray = data.destinations
         .split(",")
         .map((d) => d.trim())
         .filter(Boolean);
       formData.append("destination", JSON.stringify(destArray));
-      // formData.append("hotel", data.hotels || "");
 
       // categoryAndPrice -> convert prices to numbers
       const catPricePayload = (data.categoryAndPrice || []).map((cp) => ({
@@ -187,7 +231,7 @@ export default function AddPackageForm() {
       }));
       formData.append("categoryAndPrice", JSON.stringify(catPricePayload));
 
-      // itinerary as-is (array of {day, description})
+      // itinerary
       formData.append("itinerary", JSON.stringify(data.itinerary || []));
 
       // featured image file
@@ -201,16 +245,22 @@ export default function AddPackageForm() {
         activitiesMeta.push({ activityName: a.activityName });
 
         if (a.image) {
-          formData.append("activityImages", a.image); // SAME FIELD NAME
+          formData.append("activityImages", a.image);
         }
       });
 
       formData.append("activity", JSON.stringify(activitiesMeta));
 
-      // Debug log - remove in production
-      // for (const pair of formData.entries()) {
-      //   console.log(pair[0], pair[1]);
-      // }
+      // NEW: availableDates — send as JSON array like ["2026-01-15","2026-01-20"]
+      const datesPayload = (data.availableDates || []).filter(Boolean);
+      if (datesPayload.length > 0) {
+        formData.append("availableDates", JSON.stringify(datesPayload));
+      }
+
+      // Optional: also send groupStart separately if needed by backend
+      if (data.groupStart) {
+        formData.append("groupStart", data.groupStart);
+      }
 
       // POST request
       const res = await api.post("/packages/", formData, {
@@ -219,20 +269,11 @@ export default function AddPackageForm() {
 
       if (res?.data?.success) {
         toast.success(res.data.message || "Package created");
-        // optional: navigate to package list or view created package
-        // If API returns created package ID, navigate to edit or view
-        const created = res.data.data;
-        // if (created?._id) {
-        //   router.push(`/dashboard/packages/${created._id}`);
-        //   return;
-        // }
-        // fallback: reset form
         reset();
       } else {
         toast.error(res?.data?.message || "Failed to create package");
       }
     } catch (err: any) {
-      // axios interceptor may show toast, but handle here too
       const message =
         err?.response?.data?.message ||
         err?.message ||
@@ -378,7 +419,7 @@ export default function AddPackageForm() {
             />
           </div>
 
-          {/* Price placeholder removed (now per-category) and Destination */}
+          {/* Destinations + Available Dates */}
           <div className="grid grid-cols-1 gap-6 ">
             <div>
               <label className="block text-sm font-semibold mb-1">
@@ -394,18 +435,62 @@ export default function AddPackageForm() {
                 Separate multiple destinations with commas.
               </p>
             </div>
-            {/* 
+
+            {/* Group start single date + Add date button -> appends to availableDates */}
             <div>
-              <label className="block text-sm font-semibold mb-1">Hotels</label>
-              <select
-                {...register("hotels")}
-                className="w-full border rounded-lg px-4 py-2"
-              >
-                <option value="">Choose Hotels</option>
-                <option value="hotel-a">Hotel A</option>
-                <option value="hotel-b">Hotel B</option>
-              </select>
-            </div> */}
+              <label className="block text-sm font-semibold mb-1">
+                Group tour starting date
+              </label>
+
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-600">Select date</label>
+                  <input
+                    {...register("groupStart")}
+                    type="date"
+                    className="w-full border rounded-lg px-3 py-2"
+                    placeholder="2026-01-15"
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleAddGroupStartDate}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg"
+                  >
+                    Add date
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Available dates list (editable via remove) */}
+            <div>
+              <label className="block text-sm font-semibold mb-1">
+                Available Dates
+              </label>
+
+              <div className="space-y-2">
+                {availableDateFields.map((f, idx) => (
+                  <div key={f.id} className="flex items-center gap-2">
+                    {/* We render the date as an input so user can edit if needed */}
+                    <input
+                      {...register(`availableDates.${idx}` as const)}
+                      type="date"
+                      className="flex-1 border rounded-lg px-3 py-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAvailableDate(idx)}
+                      className="px-3 py-2 bg-rose-100 text-rose-700 rounded-lg"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -491,13 +576,6 @@ export default function AddPackageForm() {
                       className="w-full border rounded-lg px-4 py-2"
                       placeholder="Name"
                     />
-                    {errors.activities?.[index]?.activityName && (
-                      <p className="text-xs text-rose-600 mt-1">
-                        {String(
-                          errors.activities?.[index]?.activityName?.message
-                        )}
-                      </p>
-                    )}
                   </div>
 
                   <div>

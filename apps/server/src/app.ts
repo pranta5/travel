@@ -7,6 +7,9 @@ import hotelRoutes from "./routes/hotel.routes";
 import bookingRoutes from "./routes/booking.routes";
 import enquiryRoutes from "./routes/enquiry.routes";
 import callbackRoutes from "./routes/callback.routes";
+import paymentRoutes from "./routes/payment.route";
+import dashboardRoutes from "./routes/dashboard.routes";
+
 import cors from "cors";
 const app = express();
 import dotenv from "dotenv";
@@ -31,5 +34,7 @@ app.use("/api/hotels", hotelRoutes);
 app.use("/api/booking", bookingRoutes);
 app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/callback", callbackRoutes);
+app.use("/api", paymentRoutes);
+app.use("/api", dashboardRoutes);
 
 export default app;

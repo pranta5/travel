@@ -92,6 +92,10 @@ export default function ManageEnquiryDesign() {
       const { data } = await api.get(`/enquiries?${queryParams}`);
       return data;
     },
+    staleTime: 0,
+    // refetchInterval: 5000,
+    placeholderData: "previous",
+    refetchOnWindowFocus: true,
   });
 
   const enquiries: Enquiry[] = response?.data || [];

@@ -1,6 +1,6 @@
 // src/components/DashboardSidebar.tsx
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,6 +13,7 @@ import {
   Package,
   Hotel,
   Inbox,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -29,39 +30,72 @@ export default function DashboardSidebar() {
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen]);
 
-  const navItems = [
+  const ALL_NAV = [
     {
       href: "/dashboard",
       label: "Dashboard",
       icon: <LayoutDashboard size={18} />,
+      key: "dashboard",
     },
-    // {
-    //   href: "/dashboard/addblog",
-    //   label: "Add Blogs",
-    //   icon: <PenLine size={18} />,
-    // },
     {
       href: "/dashboard/addpackage",
       label: "Add Packages",
       icon: <Package size={18} />,
+      key: "addpackage",
     },
-    // { href: "/dashboard/addhotel", label: "Hotels", icon: <Hotel size={18} /> },
     {
       href: "/dashboard/enquiry",
       label: "Manage Enquiry",
       icon: <Inbox size={18} />,
+      key: "enquiry",
     },
     {
       href: "/dashboard/bookings",
       label: "Manage Bookings",
       icon: <Inbox size={18} />,
+      key: "managebookings",
     },
     {
       href: "/dashboard/profile",
-      label: "profile",
+      label: "Profile",
+      icon: <User size={18} />,
+      key: "profile",
+    },
+    // {
+    //   href: "/dashboard/chat",
+    //   label: "Chat",
+    //   icon: <MessageSquare size={18} />,
+    //   key: "chat",
+    // },
+    // {
+    //   href: "/dashboard/admin/assign",
+    //   label: "Assign",
+    //   icon: <PenLine size={18} />,
+    //   key: "assign",
+    // },
+    {
+      href: "/dashboard/mybooking",
+      label: "My Booking",
       icon: <Inbox size={18} />,
+      key: "mybooking",
     },
   ];
+
+  const navItems = useMemo(() => {
+    const role = user?.role ?? "user";
+    return ALL_NAV.filter((item) => {
+      if (role === "admin") return !["mybooking"].includes(item.key);
+      if (role === "user")
+        return ["profile", "mybooking", "chat"].includes(item.key);
+      if (role === "employee")
+        return ["profile", "managebookings", "enquiry", "chat"].includes(
+          item.key
+        );
+      if (role === "manager")
+        return !["dashboard", "mybooking"].includes(item.key);
+      return !["assign"].includes(item.key);
+    });
+  }, [user]);
 
   const isActive = useCallback(
     (href: string) => pathname === href || pathname.startsWith(href + "/"),
@@ -70,7 +104,7 @@ export default function DashboardSidebar() {
 
   return (
     <>
-      {/* Mobile menu button (hidden from md up) */}
+      {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
         className="md:hidden fixed left-4 top-4 z-50 p-2 bg-white/90 text-teal-800 rounded-md shadow"
@@ -79,10 +113,10 @@ export default function DashboardSidebar() {
         <Menu size={24} />
       </button>
 
-      {/* Backdrop (only below md) */}
+      {/* Backdrop (mobile) */}
       {isOpen && (
         <div
-          className="fixed inset-0 top-16 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 top-0 bg-black/50 z-30 md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -92,11 +126,11 @@ export default function DashboardSidebar() {
         className={`bg-teal-800 text-white w-56 md:w-56 lg:w-64 z-40 transform transition-transform duration-300 flex flex-col
           ${
             isOpen
-              ? "fixed top-16 left-0 bottom-0 translate-x-0"
-              : "fixed top-16 left-0 -translate-x-full"
+              ? "fixed top-0 left-0 bottom-0 translate-x-0"
+              : "fixed top-0 left-0 -translate-x-full"
           }
-          md:fixed md:top-16 md:left-0 md:translate-x-0 md:bottom-[var(--footer-h,0)] md:h-[calc(100vh-4rem)]
-          lg:bottom-[var(--footer-h,0)] lg:h-[calc(100vh-4rem)]`}
+          md:fixed md:top-0 md:left-0 md:translate-x-0 md:bottom-0 md:h-screen
+          lg:bottom-0 lg:h-screen`}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-teal-700 flex-shrink-0">
@@ -105,8 +139,8 @@ export default function DashboardSidebar() {
               <User size={22} className="text-teal-200" />
             </div>
             <div>
-              <p className="text-sm font-medium">{user?.name}</p>
-              <p className="text-xs text-teal-200/70">{user?.role}</p>
+              <p className="text-sm font-medium">{user?.name ?? "Guest"}</p>
+              <p className="text-xs text-teal-200/70">{user?.role ?? "-"}</p>
             </div>
           </div>
 
@@ -119,7 +153,7 @@ export default function DashboardSidebar() {
           </button>
         </div>
 
-        {/* Nav (scrollable) */}
+        {/* Nav */}
         <nav className="p-4 space-y-2 overflow-y-auto flex-1 min-h-0">
           {navItems.map((item) => {
             const active = isActive(item.href);
@@ -142,12 +176,17 @@ export default function DashboardSidebar() {
 
         {/* Footer (logout) */}
         <div className="p-4 border-t border-teal-700 flex-shrink-0">
-          <Link
-            href="/dashboard/logout"
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-teal-700 hover:bg-teal-600"
+          <button
+            onClick={() => logout?.()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-teal-700 hover:bg-teal-600"
           >
             <LogOut size={16} />
             Logout
+          </button>
+          <Link href={"/"}>
+            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-teal-700 hover:bg-teal-600">
+              Home
+            </button>
           </Link>
         </div>
       </aside>

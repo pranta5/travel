@@ -1,13 +1,7 @@
 import logger from "../logger";
-import fs from "fs/promises"; // For cleaning up temp files
+import fs from "fs/promises";
 import cloudinary from "../config/cloudinary";
 
-/**
- * Upload a single image to Cloudinary.
- * @param filePath Local path to the image file.
- * @param folder Optional folder in Cloudinary (default: "hikesike-app").
- * @returns Secure URL of the uploaded image.
- */
 export const uploadSingleImage = async (
   filePath: string,
   folder: string = "hikesike-app"
@@ -22,24 +16,24 @@ export const uploadSingleImage = async (
   }
 };
 
-/**
- * Upload multiple images to Cloudinary.
- * @param filePaths Array of local paths to image files.
- * @param folder Optional folder in Cloudinary (default: "hikesike-app").
- * @returns Array of secure URLs for the uploaded images.
- */
 export const uploadMultipleImagesCloudi = async (
   filePaths: string[],
   folder: string = "hikesike-app"
 ): Promise<string[]> => {
   try {
     const uploads = await Promise.all(
-      filePaths.map((path) =>
-        cloudinary.uploader.upload(path, { folder }).then(async (result) => {
-          await fs.unlink(path).catch(() => {}); // Clean up temp file
+      filePaths.map(async (path) => {
+        try {
+          const result = await cloudinary.uploader.upload(path, { folder });
           return result.secure_url;
-        })
-      )
+        } catch (err) {
+          logger.error("Cloudinary upload failed for:", path, err);
+          throw err; // bubble up so Promise.all fails
+        } finally {
+          // ALWAYS cleanup temp file
+          await fs.unlink(path).catch(() => {});
+        }
+      })
     );
     return uploads;
   } catch (err: any) {
@@ -48,17 +42,12 @@ export const uploadMultipleImagesCloudi = async (
   }
 };
 
-/**
- * Extract public_id from Cloudinary URL
- * Example: https://res.cloudinary.com/dxxx/image/upload/v1234567890/hikesike-app/packages/abc123.jpg
- * → public_id = "hikesike-app/packages/abc123"
- */
 const getPublicIdFromUrl = (url: string): string | null => {
   try {
     const parts = url.split("/upload/");
     if (parts.length < 2) return null;
     const afterUpload = parts[1];
-    const withoutVersion = afterUpload.split("/").slice(1).join("/"); // remove v123...
+    const withoutVersion = afterUpload.split("/").slice(1).join("/");
     const withoutExtension = withoutVersion.split(".")[0];
     return withoutExtension;
   } catch {

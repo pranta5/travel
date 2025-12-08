@@ -3,11 +3,11 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  fallback?: ReactNode; // optional loading spinner
+  fallback?: ReactNode;
 }
 
 export default function ProtectedRoute({
@@ -21,14 +21,18 @@ export default function ProtectedRoute({
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  if (loading) {
-    return <>{fallback}</>;
-  }
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, user, router]);
 
-  if (!user) {
-    router.replace("/login");
-    return null;
-  }
+  // While loading auth state → show spinner
+  if (loading) return fallback;
 
+  // When no user but redirect queued → return null (avoid render)
+  if (!user) return null;
+
+  // Authenticated → render protected content
   return <>{children}</>;
 }

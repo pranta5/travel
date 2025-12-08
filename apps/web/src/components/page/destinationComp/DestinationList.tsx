@@ -174,7 +174,7 @@ export default function DestinationList() {
                   key={p._id}
                   className="border rounded-lg overflow-hidden shadow-sm bg-white"
                 >
-                  <Link href={`/packages/${p.slug}`} className="block">
+                  <Link href={`/package/${p.slug}`} className="block">
                     <div className="w-full h-44 bg-gray-200 overflow-hidden">
                       {p.featuredImage ? (
                         <img

@@ -16,6 +16,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@types/socket.io": "^3.0.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "connect-redis": "^9.0.0",
@@ -37,6 +38,8 @@
     "rate-limit-redis": "^4.3.0",
     "redis": "^5.10.0",
     "slugify": "^1.6.6",
+    "socket.io": "^4.8.1",
+    "stripe": "^20.0.0",
     "winston": "^3.18.3",
     "winston-daily-rotate-file": "^5.0.0"
   },

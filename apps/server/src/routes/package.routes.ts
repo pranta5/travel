@@ -5,8 +5,9 @@ import {
   getAllPackages,
   getPackageBySlug,
   updatePackage,
-  softDeletePackage,
+  updatePackageStatus,
   hardDeletePackage,
+  getPackageById,
 } from "../controllers/package.controller";
 import { requireAuth } from "../middlewares/requireAuth";
 import { uploadPackageImages } from "../middlewares/upload";
@@ -16,6 +17,7 @@ const router = Router();
 // ==================== PUBLIC ROUTES ====================
 router.get("/", getAllPackages);
 router.get("/:slug", getPackageBySlug);
+router.get("/single/:id", getPackageById);
 
 // ==================== PROTECTED: Admin & Manager Only ====================
 
@@ -35,8 +37,8 @@ router.patch(
   updatePackage
 );
 
-// Soft Delete
-router.delete("/:id", requireAuth(["admin", "manager"]), softDeletePackage);
+// Status
+router.put("/:id", requireAuth(["admin", "manager"]), updatePackageStatus);
 
 // ==================== PROTECTED: Admin  ====================
 

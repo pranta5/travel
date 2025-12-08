@@ -158,20 +158,20 @@ export default function Navbar() {
                           Hello,{" "}
                           <span className="font-semibold">{user.name}</span>
                         </div>
-                        {/* <Link
-                          href="/profile"
+                        <Link
+                          href="/dashboard/profile"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setUserOpen(false)}
                         >
                           Profile
-                        </Link> */}
-                        <Link
+                        </Link>
+                        {/* <Link
                           href="/dashboard"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setUserOpen(false)}
                         >
                           Dashboard
-                        </Link>
+                        </Link> */}
                         <button
                           onClick={handleLogout}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -247,20 +247,20 @@ export default function Navbar() {
                   <p className="text-sm font-medium text-gray-800">
                     Hi, {user.name}!
                   </p>
-                  {/* <Link
-                    href="/profile"
+                  <Link
+                    href="/dashboard/profile"
                     className="block text-sm text-gray-600"
                     onClick={() => setIsOpen(false)}
                   >
                     Profile
-                  </Link> */}
-                  <Link
+                  </Link>
+                  {/* <Link
                     href="/dashboard"
                     className="block text-sm text-gray-600"
                     onClick={() => setIsOpen(false)}
                   >
                     Dashboard
-                  </Link>
+                  </Link> */}
                   <button
                     onClick={handleLogout}
                     className="block text-sm text-red-600 w-full text-left"

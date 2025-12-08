@@ -68,7 +68,7 @@ export default function ProfileCard({ user, onEdit }: Props) {
                 )}
               </div>
 
-              <div className="mt-3 flex gap-2">
+              {/* <div className="mt-3 flex gap-2">
                 <button
                   type="button"
                   onClick={() => onEdit?.()}
@@ -82,7 +82,7 @@ export default function ProfileCard({ user, onEdit }: Props) {
                 >
                   Settings
                 </button>
-              </div>
+              </div> */}
             </div>
           </div>
 
@@ -112,7 +112,7 @@ export default function ProfileCard({ user, onEdit }: Props) {
           </div>
 
           {/* Right: Referral + Wallet */}
-          <div className="md:col-span-1 space-y-4">
+          {/* <div className="md:col-span-1 space-y-4">
             <div className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm">
               <div>
                 <p className="text-sm text-gray-500">Referral Code</p>
@@ -148,7 +148,6 @@ export default function ProfileCard({ user, onEdit }: Props) {
               </div>
             </div>
 
-            {/* Referred By (if available) */}
             <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
               <div className="font-medium text-gray-800">Referred By</div>
               <div className="mt-1">
@@ -161,14 +160,14 @@ export default function ProfileCard({ user, onEdit }: Props) {
                 )}
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Optional: a bottom info row */}
-        <div className="border-t px-6 py-4 text-sm text-gray-500">
+        {/* <div className="border-t px-6 py-4 text-sm text-gray-500">
           <span>Account ID: </span>
           <span className="font-mono text-xs text-gray-700">{user._id}</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );

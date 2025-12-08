@@ -5,7 +5,7 @@ const categoryAndPriceSchema = new Schema(
   {
     category: {
       type: String,
-      enum: ["standard", "deluxe", "super deluxe"],
+      enum: ["standard", "deluxe", "superdeluxe"],
       required: true,
     },
     price: { type: Number, required: true },
@@ -59,6 +59,7 @@ const packageSchema = new Schema<IPackage>(
       type: [activitySchema],
       default: [],
     },
+    availableDates: [{ type: Date }],
     isActive: {
       type: Boolean,
       default: true,

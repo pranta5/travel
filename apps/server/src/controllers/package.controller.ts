@@ -13,6 +13,7 @@ import {
 import redisClient from "../config/redis";
 import logger from "../logger";
 import generateUniqueSlug from "../utils/slugGenerator";
+import { Types } from "mongoose";
 
 // Helper: Safely parse JSON strings from form-data
 const parseJSON = (value: any, fieldName: string): any => {
@@ -27,7 +28,6 @@ const parseJSON = (value: any, fieldName: string): any => {
 };
 
 // Cache keys
-const getAllCacheKey = (query: string) => `packages:all:${query}`;
 const getBySlugCacheKey = (slug: string) => `package:slug:${slug}`;
 
 // Invalidate related caches
@@ -41,7 +41,7 @@ const invalidatePackageCaches = async (slug?: string) => {
     logger.warn("Failed to invalidate Redis cache", err);
   }
 };
-
+//create
 export const createPackage = async (req: Request, res: Response) => {
   try {
     let body = req.body;
@@ -49,6 +49,7 @@ export const createPackage = async (req: Request, res: Response) => {
     // Auto-parse all JSON string fields from form-data
     body = {
       ...body,
+      availableDates: parseJSON(body.availableDates, "availableDates"),
       destination: parseJSON(body.destination, "destination"),
       categoryAndPrice: parseJSON(body.categoryAndPrice, "categoryAndPrice"),
       itinerary: parseJSON(body.itinerary, "itinerary"),
@@ -62,8 +63,7 @@ export const createPackage = async (req: Request, res: Response) => {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     // Upload featured image
-    if (!files?.featuredImage?.[0])
-      throw new Error("featuredImage is required");
+    if (!files?.featuredImage?.[0]) logger.error("featuredImage is required");
     validated.value.featuredImage = await uploadSingleImage(
       files.featuredImage[0].path
     );
@@ -72,7 +72,7 @@ export const createPackage = async (req: Request, res: Response) => {
     if (validated.value.activity?.length > 0) {
       const activityFiles = files?.activityImages || [];
       if (activityFiles.length !== validated.value.activity.length) {
-        throw new Error(
+        logger.error(
           "Number of activityImages must match number of activities"
         );
       }
@@ -106,127 +106,95 @@ export const createPackage = async (req: Request, res: Response) => {
   }
 };
 
-// Helper: escape user string for safe regex
-function escapeRegex(str = "") {
+// helpers
+function escapeRegex(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
-/**
- * GET /api/packages
- * Query params: page, limit, destination (partial), category
- */
+//all
 export const getAllPackages = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, destination, category } = req.query;
+    const {
+      page = "1",
+      limit = "10",
+      search,
+      destination,
+      category,
+      sort,
+    } = req.query as {
+      page?: string;
+      limit?: string;
+      search?: string;
+      destination?: string;
+      category?: string;
+      sort?: string;
+    };
+
     const pageNum = Math.max(1, Number(page || 1));
     const limitNum = Math.max(1, Number(limit || 10));
     const skip = (pageNum - 1) * limitNum;
 
-    // Normalize query for cache key (avoid cache misses due to case/spacing)
-    const normalizedQuery: any = { ...req.query };
-    if (normalizedQuery.destination) {
-      normalizedQuery.destination = String(normalizedQuery.destination)
-        .trim()
-        .toLowerCase();
-    }
-    if (normalizedQuery.category) {
-      normalizedQuery.category = String(normalizedQuery.category)
-        .trim()
-        .toLowerCase();
-    }
-    const cacheKey = `packages:list:${JSON.stringify(normalizedQuery)}`;
+    // Normalize cache key
+    const normalized: any = {
+      page: pageNum,
+      limit: limitNum,
+      search: search ? String(search).trim().toLowerCase() : undefined,
+      destination: destination
+        ? String(destination).trim().toLowerCase()
+        : undefined,
+      category: category ? String(category).trim().toLowerCase() : undefined,
+      sort: sort || undefined,
+    };
+    const cacheKey = `packages:list:${JSON.stringify(normalized)}`;
 
-    // Try redis cache
+    // Try cache
     const cached = await redisClient.get(cacheKey);
     if (cached) {
       logger.info("Cache hit: packages list");
       return res.json({ success: true, ...JSON.parse(cached) });
     }
 
-    // Build match stage base
-    const baseMatch: any = { isActive: true };
+    // Base match
+    const match: any = { isActive: true };
 
-    // If category provided — exact match on category field inside categoryAndPrice
+    // category filter (case-insensitive on array element)
     if (category) {
-      baseMatch["categoryAndPrice.category"] = category as string;
-    }
-
-    // If no destination/search provided, use simple pipeline (no scoring)
-    if (!destination) {
-      const [result] = await Package.aggregate([
-        { $match: baseMatch },
-        {
-          $lookup: {
-            from: "hotels",
-            localField: "hotel",
-            foreignField: "_id",
-            as: "hotel",
+      match["categoryAndPrice"] = {
+        $elemMatch: {
+          category: {
+            $regex: `^${escapeRegex(String(category).trim())}$`,
+            $options: "i",
           },
-        },
-        { $unwind: { path: "$hotel", preserveNullAndEmptyArrays: true } },
-        { $sort: { createdAt: -1 } },
-        {
-          $facet: {
-            data: [
-              { $skip: skip },
-              { $limit: limitNum },
-              {
-                $project: {
-                  __v: 0,
-                  "hotel.__v": 0,
-                  "hotel.createdAt": 0,
-                  "hotel.updatedAt": 0,
-                },
-              },
-            ],
-            totalCount: [{ $count: "total" }],
-          },
-        },
-      ]);
-
-      const packages = result.data;
-      const total = result.totalCount[0]?.total || 0;
-      const response = {
-        data: packages,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          pages: Math.ceil(total / limitNum),
         },
       };
-
-      await redisClient.setex(cacheKey, 300, JSON.stringify(response));
-      return res.json({ success: true, ...response });
     }
 
-    // ---------- Destination/search provided: build regex and scoring ----------
-    const raw = String(destination).trim();
-    const escaped = escapeRegex(raw);
-    // substring (anywhere) case-insensitive. Use ^ for starts-with if desired.
-    const regex = new RegExp(escaped, "i");
+    // If user passed destination but not search, treat destination as search term too
+    const searchTerm =
+      search ?? destination ? String(search ?? destination).trim() : "";
 
-    // Aggregation pipeline with scoring:
-    // score weights: title match = 5, destination match = 4, overview match = 2
-    const pipeline: any[] = [
-      { $match: baseMatch },
+    // Start pipeline
+    const pipeline: any[] = [{ $match: match }];
 
-      // compute boolean matches and score
-      {
+    if (searchTerm) {
+      const r = new RegExp(escapeRegex(searchTerm), "i");
+
+      pipeline.push({
         $addFields: {
-          // title match boolean
           titleMatch: {
-            $cond: [{ $regexMatch: { input: "$title", regex } }, 1, 0],
+            $cond: [{ $regexMatch: { input: "$title", regex: r } }, 1, 0],
           },
-          // overview match boolean
           overviewMatch: {
             $cond: [
-              { $regexMatch: { input: { $ifNull: ["$overview", ""] }, regex } },
+              {
+                $regexMatch: {
+                  input: { $ifNull: ["$overview", ""] },
+                  regex: r,
+                },
+              },
               1,
               0,
             ],
           },
-          // destination match boolean: check any array element with regex
           destinationMatch: {
             $cond: [
               {
@@ -236,7 +204,7 @@ export const getAllPackages = async (req: Request, res: Response) => {
                       $filter: {
                         input: { $ifNull: ["$destination", []] },
                         as: "d",
-                        cond: { $regexMatch: { input: "$$d", regex } },
+                        cond: { $regexMatch: { input: "$$d", regex: r } },
                       },
                     },
                   },
@@ -248,10 +216,9 @@ export const getAllPackages = async (req: Request, res: Response) => {
             ],
           },
         },
-      },
+      });
 
-      // compute score using weights
-      {
+      pipeline.push({
         $addFields: {
           searchScore: {
             $add: [
@@ -261,12 +228,26 @@ export const getAllPackages = async (req: Request, res: Response) => {
             ],
           },
         },
+      });
+
+      // only keep docs which matched something
+      pipeline.push({ $match: { searchScore: { $gt: 0 } } });
+    }
+
+    // Compute helper fields: minPrice (for price sorting) and primaryCategory (for category sorting)
+    pipeline.push({
+      $addFields: {
+        minPrice: { $min: { $ifNull: ["$categoryAndPrice.price", []] } },
+        primaryCategory: {
+          $toLower: {
+            $ifNull: [{ $arrayElemAt: ["$categoryAndPrice.category", 0] }, ""],
+          },
+        },
       },
+    });
 
-      // Only keep docs that matched at least one field (score > 0)
-      { $match: { searchScore: { $gt: 0 } } },
-
-      // lookup hotel and unwind
+    // Lookup hotel and unwind (optional; keep data enriched)
+    pipeline.push(
       {
         $lookup: {
           from: "hotels",
@@ -275,39 +256,54 @@ export const getAllPackages = async (req: Request, res: Response) => {
           as: "hotel",
         },
       },
-      { $unwind: { path: "$hotel", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$hotel", preserveNullAndEmptyArrays: true } }
+    );
 
-      // sort by relevance (score desc), then newest
-      { $sort: { searchScore: -1, createdAt: -1 } },
+    // Sorting
+    const hasSearch = Boolean(searchTerm);
+    let sortStage: any = {};
+    if (sort === "category") {
+      sortStage = { primaryCategory: 1, createdAt: -1 };
+    } else if (sort === "price_asc") {
+      sortStage = { minPrice: 1, createdAt: -1 };
+    } else if (sort === "price_desc") {
+      sortStage = { minPrice: -1, createdAt: -1 };
+    } else if (hasSearch && (sort === "relevance" || !sort)) {
+      sortStage = { searchScore: -1, createdAt: -1 };
+    } else {
+      sortStage = { createdAt: -1 };
+    }
+    pipeline.push({ $sort: sortStage });
 
-      // pagination + projection
-      {
-        $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limitNum },
-            {
-              $project: {
-                titleMatch: 0,
-                overviewMatch: 0,
-                destinationMatch: 0,
-                searchScore: 0,
-                __v: 0,
-                "hotel.__v": 0,
-                "hotel.createdAt": 0,
-                "hotel.updatedAt": 0,
-              },
+    // Pagination + projection
+    pipeline.push({
+      $facet: {
+        data: [
+          { $skip: skip },
+          { $limit: limitNum },
+          {
+            $project: {
+              titleMatch: 0,
+              overviewMatch: 0,
+              destinationMatch: 0,
+              searchScore: 0,
+              minPrice: 0,
+              primaryCategory: 0,
+              __v: 0,
+              "hotel.__v": 0,
+              "hotel.createdAt": 0,
+              "hotel.updatedAt": 0,
             },
-          ],
-          totalCount: [{ $count: "total" }],
-        },
+          },
+        ],
+        totalCount: [{ $count: "total" }],
       },
-    ];
+    });
 
     const [result] = await Package.aggregate(pipeline);
 
-    const packages = result.data || [];
-    const total = result.totalCount[0]?.total || 0;
+    const packages = result?.data || [];
+    const total = result?.totalCount?.[0]?.total || 0;
 
     const response = {
       data: packages,
@@ -319,13 +315,13 @@ export const getAllPackages = async (req: Request, res: Response) => {
       },
     };
 
-    // Cache for 5 minutes
+    // cache for 5 minutes
     await redisClient.setex(cacheKey, 300, JSON.stringify(response));
 
-    res.json({ success: true, ...response });
+    return res.json({ success: true, ...response });
   } catch (err: any) {
     logger.error("Get All Packages Error:", err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
 
@@ -379,6 +375,50 @@ export const getPackageBySlug = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+//byid
+
+export const getPackageById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // validate id early
+    if (!Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid package id" });
+    }
+    const oid = new Types.ObjectId(id);
+
+    const cacheKey = `package:id:${id}`;
+
+    // Try Redis cache first
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      logger.info("Cache hit: package id");
+      return res.json({ success: true, data: JSON.parse(cached) });
+    }
+
+    const result = await Package.aggregate([
+      { $match: { _id: oid, isActive: true } },
+    ]);
+
+    if (!result || result.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Package not found" });
+    }
+
+    const pkg = result[0];
+
+    // Cache for 10 minutes
+    await redisClient.setex(cacheKey, 600, JSON.stringify(pkg));
+
+    return res.json({ success: true, data: pkg });
+  } catch (err: any) {
+    logger.error("Get Package By id Error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
 
 export const updatePackage = async (req: Request, res: Response) => {
   try {
@@ -387,6 +427,7 @@ export const updatePackage = async (req: Request, res: Response) => {
 
     body = {
       ...body,
+      availableDates: parseJSON(body.availableDates, "availableDates"),
       destination: parseJSON(body.destination, "destination"),
       categoryAndPrice: parseJSON(body.categoryAndPrice, "categoryAndPrice"),
       itinerary: parseJSON(body.itinerary, "itinerary"),
@@ -466,52 +507,49 @@ export const hardDeletePackage = async (req: Request, res: Response) => {
   }
 };
 
-export const softDeletePackage = async (req: Request, res: Response) => {
+export const updatePackageStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { active } = req.query; // "true" | "false"
 
-    // Find the package first (to get slug for cache invalidation)
-    const pkg = await Package.findById(id).select("slug");
-    if (!pkg) {
-      return res.status(404).json({
+    if (active === undefined) {
+      return res.status(400).json({
         success: false,
-        error: "Package not found",
+        error: "Missing 'active' query param (true/false)",
       });
     }
 
-    // Soft delete → just set isActive = false
+    const checkIsActive = active === "true";
+
+    const pkg = await Package.findById(id).select("slug");
+    if (!pkg) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Package not found" });
+    }
+
     const updated = await Package.findByIdAndUpdate(
       id,
-      { isActive: false },
+      { isActive: checkIsActive },
       { new: true }
     ).select("-__v");
 
-    // Invalidate Redis cache
-    const cacheKeysToDelete = [
-      `packages:all:*`, // all list caches
-      `package:slug:${pkg.slug}`, // individual package cache
-    ];
-
+    // 🔄 Invalidate cache
     try {
       const keys = await redisClient.keys("packages:all:*");
       if (keys.length > 0) await redisClient.del(keys);
       await redisClient.del(`package:slug:${pkg.slug}`);
-      logger.info(`Cache invalidated for package: ${pkg.slug}`);
-    } catch (cacheErr) {
-      logger.warn("Redis cache invalidation failed (non-critical)", cacheErr);
-      // Don't fail the request if Redis is down
+    } catch (err) {
+      logger.warn("Redis cache invalidation failed", err);
     }
 
     return res.json({
       success: true,
-      message: "Package deactivated successfully",
+      message: checkIsActive ? "Package activated" : "Package deactivated",
       data: updated,
     });
   } catch (err: any) {
-    logger.error("Soft Delete Package Error:", err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || "Server error",
-    });
+    logger.error("Update Package Status Error:", err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };

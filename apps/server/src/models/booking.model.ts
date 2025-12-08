@@ -17,6 +17,15 @@ const bookingSchema = new Schema<IBooking>(
       required: true,
       index: true, // fast lookup by package
     },
+    bookingId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    category: {
+      type: String,
+      required: true,
+    },
 
     totalTraveler: {
       type: Number,
@@ -70,6 +79,30 @@ const bookingSchema = new Schema<IBooking>(
       type: Date,
       default: Date.now,
     },
+    // ─── Stripe Payment Info ─────────────
+    paymentInfo: {
+      type: {
+        stripeSessionId: {
+          type: String,
+          required: true,
+        },
+        paymentIntentId: {
+          type: String,
+          default: null,
+        },
+        amount_total: {
+          type: Number,
+          default: null,
+        },
+        currency: {
+          type: String,
+          lowercase: true,
+          default: null,
+        },
+      },
+      required: true,
+      _id: false,
+    } as any,
   },
   {
     timestamps: true, // auto adds createdAt & updatedAt

@@ -13,8 +13,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <DashboardSidebar />
 
       {/* MAIN: add top padding for the fixed header and left margin on large screens */}
-      <div className="pt-16 transition-all duration-200 md:ml-56 lg:ml-64">
-        <main className="px-6 md:px-10 lg:px-12 py-8 pb-16">{children}</main>
+      <div className="transition-all duration-200 md:ml-56 lg:ml-64">
+        <main className="px-4 md:px-4 lg:px-12 py-4 pb-16">{children}</main>
       </div>
     </div>
   );

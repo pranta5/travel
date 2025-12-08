@@ -3,35 +3,24 @@ import { Router } from "express";
 import {
   createBooking,
   getMyBookings,
-  updatePaymentStatus,
-  updateBookingStatus,
   getAllBookings,
+  updateBooking,
 } from "../controllers/booking.controller";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 
-// ───────────────────────────────
 // USER ROUTES (logged-in user)
-// ───────────────────────────────
-router.post("/", requireAuth(), createBooking); // Create booking
-router.get("/my", requireAuth(), getMyBookings); // My bookings
+router.post("/", requireAuth(), createBooking);
+router.get("/my", requireAuth(), getMyBookings);
 
-// ───────────────────────────────
 // ADMIN / MANAGER ROUTES
-// ───────────────────────────────
-router.get("/", requireAuth(["admin", "manager"]), getAllBookings);
+router.get("/", requireAuth(["admin", "manager", "employee"]), getAllBookings);
 
 router.patch(
-  "/:id/payment",
-  requireAuth(["admin", "manager"]),
-  updatePaymentStatus
-);
-
-router.patch(
-  "/:id/status",
-  requireAuth(["admin", "manager"]),
-  updateBookingStatus
+  "/:id",
+  requireAuth(["admin", "manager", "employee"]),
+  updateBooking
 );
 
 export default router;

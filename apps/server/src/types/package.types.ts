@@ -1,7 +1,7 @@
 import { Document, Types } from "mongoose";
 
 export interface ICategoryAndPrice {
-  category: "standard" | "deluxe" | "super deluxe";
+  category: "standard" | "deluxe" | "superdeluxe";
   price: number;
 }
 
@@ -25,6 +25,7 @@ export interface IPackage extends Document {
   hotel?: Types.ObjectId | null;
   itinerary: IItinerary[];
   activity: IActivity[];
+  availableDates: Date[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

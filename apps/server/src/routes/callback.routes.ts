@@ -12,8 +12,12 @@ const router = Router();
 // Public
 router.post("/", requestCallback);
 
-// Admin only
-router.get("/", requireAuth(["admin", "manager"]), getAllCallbacks);
-router.patch("/:id", requireAuth(["admin", "manager"]), updateCallbackStatus);
+// private
+router.get("/", requireAuth(["admin", "manager", "employee"]), getAllCallbacks);
+router.patch(
+  "/:id",
+  requireAuth(["admin", "manager", "employee"]),
+  updateCallbackStatus
+);
 
 export default router;

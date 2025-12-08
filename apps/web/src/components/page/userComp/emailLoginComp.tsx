@@ -40,7 +40,7 @@ const EmailLoginComp = () => {
       toast.success("Logged in successfully!");
 
       // Redirect
-      router.push("/dashboard/profile");
+      router.push("/");
 
       reset(); // optional: clear form
     } catch (err: any) {

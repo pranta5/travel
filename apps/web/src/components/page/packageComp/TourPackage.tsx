@@ -9,6 +9,8 @@ import { IoMdStar } from "react-icons/io";
 import OverviewSection from "./OverviewSection";
 import ItineraryTimeline from "./ItineraryTimeline";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "react-toastify";
 
 /* ---------------------
    Types
@@ -57,7 +59,7 @@ export type FAQItem = {
   a: string;
 };
 type PackageOption = {
-  type: "Standard" | "Deluxe" | "Super Deluxe";
+  type: "Standard" | "Deluxe" | "superdeluxe";
   price: number;
   discountPrice?: number;
   features?: string[];
@@ -65,13 +67,14 @@ type PackageOption = {
 
 export type TourPackageProps = {
   title: string;
+  slug: string;
   id: string;
   duration: string;
   locations: { name: string; days: number }[];
   price: number;
-  discountPrice?: number;
-  rating?: number;
-  reviews?: number;
+  // discountPrice?: number;
+  // rating?: number;
+  // reviews?: number;
   images: ImageItem[]; // first image will be large, next two small
   itinerary: ItineraryItem[];
   overview?: OverviewProp;
@@ -84,13 +87,14 @@ export type TourPackageProps = {
 
 export default function TourPackage({
   title,
+  slug,
   id,
   duration,
   locations,
   price,
-  discountPrice,
-  rating = 0,
-  reviews = 0,
+  // discountPrice,
+  // rating = 0,
+  // reviews = 0,
   images,
   itinerary,
   overview,
@@ -100,11 +104,11 @@ export default function TourPackage({
   askExpertProps,
   packages,
 }: TourPackageProps) {
-  const [openDay, setOpenDay] = useState<number | null>(0);
   const tabs = ["Itinerary", "Overview", "Activities", "Cost", "FAQ"];
   const [activeTab, setActiveTab] = useState<string>("Itinerary");
   const [selectedPackage, setSelectedPackage] = useState<string>("");
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (packages && packages.length > 0) {
@@ -334,17 +338,27 @@ export default function TourPackage({
                         ₹{pkg.discountPrice}
                       </span> */}
                       <span className="text-3xl font-bold text-black">
-                        ₹{pkg.price}
+                        ₹{pkg.price}{" "}
+                        <span className="text-sm font-light">/ Person</span>
                       </span>
                     </div>
                     <hr />
+                    {!user ? (
+                      <button
+                        onClick={() => router.push("/login")}
+                        className="mt-6 w-full bg-amber-500 text-white py-2 rounded hover:bg-amber-600"
+                      >
+                        Login to Book
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push(`/booking/${id}`)}
+                        className="mt-6 w-full bg-amber-500 text-white py-2 rounded hover:bg-amber-600"
+                      >
+                        Book Now
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => router.push(`/booking/${id}`)}
-                      className="mt-6 w-full bg-amber-500 text-white py-2 rounded hover:bg-amber-600"
-                    >
-                      Book Now
-                    </button>
                     <button className="mt-6 w-full bg-cyan-500 text-white py-2 rounded hover:bg-cyan-600">
                       Request A Callback
                     </button>

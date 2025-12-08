@@ -22,8 +22,8 @@ import MailService, { verifyEmailToken } from "../services/mail.service"; // opt
 import redisClient from "../config/redis";
 
 // Cookie lifetimes (ms)
-const ACCESS_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000; //  1h
-const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+const ACCESS_TOKEN_MAX_AGE = env.ACCESS_TOKEN_MAX_AGE;
+const REFRESH_TOKEN_MAX_AGE = env.REFRESH_TOKEN_MAX_AGE;
 
 const publicUserProjection = (u: any) => {
   const { password, __v, ...rest } = u;
@@ -48,7 +48,7 @@ export const register = async (req: Request, res: Response) => {
     if (phoneExists)
       return res.status(409).json({ message: "Phone already in use" });
 
-    // resolve referredBy
+    //  referredBy
     let referredById: Types.ObjectId | null = null;
     if (payload.referralCode) {
       const [referrer] = await User.aggregate([
@@ -86,27 +86,6 @@ export const register = async (req: Request, res: Response) => {
     } catch (e) {
       logger.warn("[Auth:Register] Failed to send verification email: %o", e);
     }
-
-    // Acreate tokens and set cookies
-    const tokenPayload = {
-      userId: newUser._id.toString(),
-      role: newUser.role,
-      email: newUser.email,
-    };
-    const accessToken = generateAccessToken(tokenPayload);
-    const refreshToken = await generateRefreshToken(tokenPayload);
-
-    res.cookie("accessToken", accessToken, {
-      ...cookieOptions,
-      maxAge: ACCESS_TOKEN_MAX_AGE,
-      path: "/",
-    });
-    res.cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: REFRESH_TOKEN_MAX_AGE,
-      path: "/api/auth",
-    });
-
     return res.status(201).json({
       message: "register successfull",
       user: publicUserProjection(newUser.toObject()),
@@ -137,21 +116,22 @@ export const login = async (req: Request, res: Response) => {
 
     const tokenPayload = {
       userId: user._id.toString(),
+      name: user.name,
       role: user.role,
       email: user.email,
     };
     const accessToken = generateAccessToken(tokenPayload);
     const refreshToken = await generateRefreshToken(tokenPayload);
-
     res.cookie("accessToken", accessToken, {
       ...cookieOptions,
       maxAge: ACCESS_TOKEN_MAX_AGE,
       path: "/",
     });
+
     res.cookie("refreshToken", refreshToken, {
       ...cookieOptions,
       maxAge: REFRESH_TOKEN_MAX_AGE,
-      path: "/api/auth",
+      path: "/",
     });
 
     return res.json({
@@ -224,7 +204,7 @@ export const logout = async (req: Request, res: Response) => {
 };
 
 // -----------------------------
-// ME (current user) — uses aggregation instead of populate
+// ME (current user)
 // -----------------------------
 export const me = async (req: Request, res: Response) => {
   try {
@@ -270,7 +250,7 @@ export const me = async (req: Request, res: Response) => {
  * - Rate-limited via Redis key: verify:resend:email:<emailLower>
  */
 
-const RESEND_TTL_SECONDS = 5 * 60; // 5 minutes (tweak as needed)
+const RESEND_TTL_SECONDS = 5 * 60; // 5 minutes
 
 export const resendVerification = async (req: Request, res: Response) => {
   try {
@@ -285,7 +265,6 @@ export const resendVerification = async (req: Request, res: Response) => {
 
     const limited = await redisClient.get(rateKey);
     if (limited) {
-      // Generic message — do not reveal whether email exists or not
       return res
         .status(200)
         .json({ message: "If eligible, a verification email has been sent." });
@@ -294,7 +273,7 @@ export const resendVerification = async (req: Request, res: Response) => {
     // 3) find user
     const user = await User.findOne({ email: emailLower }).lean();
 
-    // 4) If no user or already verified -> set short TTL and respond generically
+    // 4) If no user or already verified
     if (!user || user.isEmailVerified) {
       await redisClient.setex(rateKey, RESEND_TTL_SECONDS, "1");
       return res
@@ -367,7 +346,6 @@ export const verifyEmail = async (req: Request, res: Response) => {
     user.isEmailVerified = true;
     await user.save();
 
-    // optionally: you can send a welcome email here (async) or enqueue a job
     logger.info("[Auth:VerifyEmail] User verified: %s", user._id.toString());
 
     return res.status(200).json({ message: "Email verified" });

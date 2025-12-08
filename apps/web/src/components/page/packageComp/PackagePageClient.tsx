@@ -6,14 +6,16 @@ import PolicySection from "@/components/page/packageComp/PolicySection";
 import Reviews from "@/components/page/packageComp/Reviews";
 import ReviewSummary from "@/components/page/packageComp/ReviewSummary";
 import TourPackage from "@/components/page/packageComp/TourPackage";
+import { usePackage } from "@/hooks/usePackage";
 
 type Props = {
-  pkg: any; // API package object
+  slug: string;
 };
 
 function mapPackageToProps(pkg: any) {
   // map title
-  const title = pkg.title || pkg?.name || "Package";
+  const title = pkg.title || "Package";
+  const slug = pkg.slug || "Package";
   const id = pkg._id || pkg.id || "";
   // duration derived from itinerary length if available, fallback to empty
   const duration =
@@ -38,11 +40,11 @@ function mapPackageToProps(pkg: any) {
     .filter(Boolean);
   const price = prices.length ? Math.min(...prices) : pkg.price || 0;
   // discountPrice: if any discount available, try to pick lowest discountPrice or price
-  const discountPrice = pkg.discountPrice ?? price;
+  // const discountPrice = pkg.discountPrice ?? price;
 
   // rating & reviews: attempt to use pkg.rating / pkg.reviews or defaults
-  const rating = pkg.rating ?? pkg.avgRating ?? 4.5;
-  const reviews = pkg.reviewsCount ?? pkg.reviews?.length ?? 0;
+  // const rating = pkg.rating ?? pkg.avgRating ?? 4.5;
+  // const reviews = pkg.reviewsCount ?? pkg.reviews?.length ?? 0;
 
   // images: try to use featuredImage + activity images
   const images =
@@ -129,13 +131,14 @@ function mapPackageToProps(pkg: any) {
 
   return {
     title,
+    slug,
     id,
     duration,
     locations,
     price,
-    discountPrice,
-    rating,
-    reviews,
+    // discountPrice,
+    // rating,
+    // reviews,
     images,
     itinerary,
     overview,
@@ -146,20 +149,34 @@ function mapPackageToProps(pkg: any) {
   };
 }
 
-export default function PackagePageClient({ pkg }: Props) {
+export default function PackagePageClient({ slug }: Props) {
+  const { data: pkg, isLoading, isError, error } = usePackage(slug);
+  if (isLoading)
+    return <div className="p-8 text-center">Loading package...</div>;
+  if (isError || !pkg)
+    return (
+      <div className="p-8 text-center">
+        <h2 className="text-2xl font-semibold">Package not found</h2>
+        <p className="text-red-500 mt-2">{(error as Error)?.message}</p>
+      </div>
+    );
+
   const mapped = mapPackageToProps(pkg);
+
+  console.log("mapped", mapped);
 
   return (
     <div className="mt-16 bg-white">
       <TourPackage
         title={mapped.title}
+        slug={mapped.slug}
         id={mapped.id}
         duration={mapped.duration}
         locations={mapped.locations}
         price={mapped.price}
-        discountPrice={mapped.discountPrice}
-        rating={mapped.rating}
-        reviews={mapped.reviews}
+        // discountPrice={mapped.discountPrice}
+        // rating={mapped.rating}
+        // reviews={mapped.reviews}
         images={mapped.images}
         itinerary={mapped.itinerary}
         overview={mapped.overview}
