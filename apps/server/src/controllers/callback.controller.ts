@@ -69,7 +69,7 @@ export const requestCallback = async (req: Request, res: Response) => {
   }
 };
 
-// ADMIN: Get all callback requests with filters
+// Get all callback requests with filters
 export const getAllCallbacks = async (req: Request, res: Response) => {
   try {
     const {
@@ -140,6 +140,7 @@ export const getAllCallbacks = async (req: Request, res: Response) => {
           preferredTime: 1,
           message: 1,
           status: 1,
+          destination: 1,
           remark: 1,
           calledAt: 1,
           source: 1,
@@ -170,7 +171,7 @@ export const getAllCallbacks = async (req: Request, res: Response) => {
       },
     };
 
-    await redisClient.setex(cacheKey, 300, JSON.stringify(response));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(response));
 
     return res.json(response);
   } catch (err: any) {
@@ -179,7 +180,7 @@ export const getAllCallbacks = async (req: Request, res: Response) => {
   }
 };
 
-// ADMIN: Update callback status
+//  Update callback status
 export const updateCallbackStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

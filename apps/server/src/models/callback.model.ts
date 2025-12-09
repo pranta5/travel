@@ -18,11 +18,9 @@ const callbackSchema = new Schema<ICallbackRequest>(
     },
     remark: String,
     calledAt: Date,
-    assignedTo: { type: Schema.Types.ObjectId, ref: "User" },
-
     source: {
       type: String,
-      enum: ["website", "popup", "package-page", "footer"],
+      enum: ["website", "facebook", "instagram", "others"],
       default: "website",
     },
     ipAddress: String,

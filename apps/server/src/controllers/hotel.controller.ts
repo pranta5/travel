@@ -49,7 +49,7 @@ export const getAllHotels = async (req: Request, res: Response) => {
     if (cached) return res.json({ success: true, data: JSON.parse(cached) });
 
     const hotels = await Hotel.find().select("-__v").sort({ hotelName: 1 });
-    await redisClient.setex(cacheKey, 3600, JSON.stringify(hotels));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(hotels));
 
     res.json({ success: true, data: hotels });
   } catch (err: any) {

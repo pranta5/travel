@@ -7,7 +7,7 @@ import redisClient from "../config/redis";
 import logger from "../logger";
 
 const CACHE_KEY = "dashboard:summary";
-const CACHE_TTL = 30; // seconds
+const CACHE_TTL = 10; // seconds
 
 export const getDashboardSummary = async (req: Request, res: Response) => {
   try {

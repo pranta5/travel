@@ -316,7 +316,7 @@ export const getAllPackages = async (req: Request, res: Response) => {
     };
 
     // cache for 5 minutes
-    await redisClient.setex(cacheKey, 300, JSON.stringify(response));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(response));
 
     return res.json({ success: true, ...response });
   } catch (err: any) {
@@ -367,7 +367,7 @@ export const getPackageBySlug = async (req: Request, res: Response) => {
     const pkg = result[0];
 
     // Cache for 10 minutes
-    await redisClient.setex(cacheKey, 600, JSON.stringify(pkg));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(pkg));
 
     res.json({ success: true, data: pkg });
   } catch (err: any) {
@@ -411,7 +411,7 @@ export const getPackageById = async (req: Request, res: Response) => {
     const pkg = result[0];
 
     // Cache for 10 minutes
-    await redisClient.setex(cacheKey, 600, JSON.stringify(pkg));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(pkg));
 
     return res.json({ success: true, data: pkg });
   } catch (err: any) {

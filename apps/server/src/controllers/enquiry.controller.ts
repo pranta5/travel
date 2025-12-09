@@ -135,7 +135,7 @@ export const getAllEnquiries = async (req: Request, res: Response) => {
       },
     };
 
-    await redisClient.setex(cacheKey, 300, JSON.stringify(response));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(response));
 
     return res.json(response);
   } catch (err: any) {

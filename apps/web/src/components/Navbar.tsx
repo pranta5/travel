@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import RequestCallbackModal from "./ui/RequestCallbackModal";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify"; // ← React-Toastify
+import api from "../lib/axios";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -83,7 +84,7 @@ export default function Navbar() {
   }) => {
     try {
       // Replace with real API call
-      // await api.post("/callback", payload);
+      await api.post("/callback", payload);
       console.log("Callback requested:", payload);
 
       toast.success("Callback request sent! We'll call you soon.");

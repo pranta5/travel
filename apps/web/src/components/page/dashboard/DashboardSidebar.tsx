@@ -56,6 +56,12 @@ export default function DashboardSidebar() {
       key: "managebookings",
     },
     {
+      href: "/dashboard/callback",
+      label: "Manage callbacks",
+      icon: <Inbox size={18} />,
+      key: "managecallbacks",
+    },
+    {
       href: "/dashboard/profile",
       label: "Profile",
       icon: <User size={18} />,
@@ -88,9 +94,13 @@ export default function DashboardSidebar() {
       if (role === "user")
         return ["profile", "mybooking", "chat"].includes(item.key);
       if (role === "employee")
-        return ["profile", "managebookings", "enquiry", "chat"].includes(
-          item.key
-        );
+        return [
+          "profile",
+          "managebookings",
+          "enquiry",
+          "chat",
+          "managecallbacks",
+        ].includes(item.key);
       if (role === "manager")
         return !["dashboard", "mybooking"].includes(item.key);
       return !["assign"].includes(item.key);

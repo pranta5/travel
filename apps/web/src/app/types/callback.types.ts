@@ -1,5 +1,4 @@
 // src/types/callback.types.ts
-import { Document, Types } from "mongoose";
 
 export type CallbackStatus =
   | "pending"
@@ -8,7 +7,7 @@ export type CallbackStatus =
   | "interested"
   | "not-interested";
 
-export interface ICallbackRequest extends Document {
+export interface ICallbackRequest {
   name: string;
   phone: string;
   preferredTime?: string; // e.g., "10AM - 12PM"
@@ -20,7 +19,7 @@ export interface ICallbackRequest extends Document {
   remark?: string;
   calledAt?: Date;
 
-  source?: "website" | "popup" | "package-page" | "footer";
+  source?: "website" | "facebook" | "instagram" | "others";
   ipAddress?: string;
   userAgent?: string;
 

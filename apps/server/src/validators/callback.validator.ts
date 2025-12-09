@@ -13,6 +13,13 @@ export const requestCallbackSchema = Joi.object({
   message: Joi.string().max(300).optional().allow(""),
   destination: Joi.string().optional().allow(""),
   source: Joi.string()
-    .valid("website", "popup", "package-page", "footer")
+    .valid("website", "facebook", "instagram", "others")
     .default("website"),
+
+  userAgent: Joi.string().optional().allow(""),
+  ipAddress: Joi.string().optional().allow(""),
+
+  status: Joi.string()
+    .valid("pending", "called", "no-answer", "interested", "not-interested")
+    .optional(),
 });

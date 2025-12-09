@@ -248,7 +248,7 @@ export const getMyBookings = async (req: Request, res: Response) => {
       },
     };
 
-    await redisClient.setex(cacheKey, 300, JSON.stringify(response));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(response));
 
     return res.json(response);
   } catch (err: any) {
@@ -404,7 +404,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
       },
     };
 
-    await redisClient.setex(cacheKey, 120, JSON.stringify(response));
+    await redisClient.setex(cacheKey, 10, JSON.stringify(response));
 
     return res.json(response);
   } catch (err: any) {

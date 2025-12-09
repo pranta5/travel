@@ -250,7 +250,7 @@ export const me = async (req: Request, res: Response) => {
  * - Rate-limited via Redis key: verify:resend:email:<emailLower>
  */
 
-const RESEND_TTL_SECONDS = 5 * 60; // 5 minutes
+const RESEND_TTL_SECONDS = 10; // 5 minutes
 
 export const resendVerification = async (req: Request, res: Response) => {
   try {
@@ -299,7 +299,7 @@ export const resendVerification = async (req: Request, res: Response) => {
       logger.error("[Auth:ResendVerify] Mail send failed: %o", mailErr);
 
       // small TTL backoff to avoid hammering when mail server down
-      await redisClient.setex(rateKey, 60, "1"); // 1 minute
+      await redisClient.setex(rateKey, 10, "1"); // 1 minute
 
       // still respond generically
       return res
