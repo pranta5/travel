@@ -111,7 +111,7 @@ export default function ManageBookingDesign() {
     },
     staleTime: 0,
     // refetchInterval: 5000,
-    placeholderData: "previous",
+    placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: true,
   });
 
@@ -169,7 +169,7 @@ export default function ManageBookingDesign() {
         return {
           ...old,
           data: old.data.map((b: Booking) =>
-            b._id === id ? { ...b, bookingStatus } : b
+            b._id === id ? { ...b, bookingStatus } : b,
           ),
         };
       });
@@ -189,9 +189,9 @@ export default function ManageBookingDesign() {
       }
     },
 
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-    },
+    // onSettled: () => {
+    //   queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    // },
 
     onSuccess: (res) => {
       // If API returns updated booking, update cache directly
@@ -202,7 +202,7 @@ export default function ManageBookingDesign() {
           return {
             ...old,
             data: old.data.map((b: Booking) =>
-              b._id === updatedBooking._id ? updatedBooking : b
+              b._id === updatedBooking._id ? updatedBooking : b,
             ),
           };
         });
@@ -229,7 +229,7 @@ export default function ManageBookingDesign() {
           return {
             ...old,
             data: old.data.map((b: Booking) =>
-              b._id === updatedBooking._id ? updatedBooking : b
+              b._id === updatedBooking._id ? updatedBooking : b,
             ),
           };
         });
@@ -273,7 +273,7 @@ export default function ManageBookingDesign() {
                   paidAmount:
                     paidAmount !== undefined ? paidAmount : b.paidAmount,
                 }
-              : b
+              : b,
           ),
         };
       });
@@ -293,9 +293,9 @@ export default function ManageBookingDesign() {
       }
     },
 
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-    },
+    // onSettled: () => {
+    //   queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    // },
 
     onSuccess: (res) => {
       const updatedBooking = res?.data;
@@ -305,7 +305,7 @@ export default function ManageBookingDesign() {
           return {
             ...old,
             data: old.data.map((b: Booking) =>
-              b._id === updatedBooking._id ? updatedBooking : b
+              b._id === updatedBooking._id ? updatedBooking : b,
             ),
           };
         });
@@ -328,7 +328,7 @@ export default function ManageBookingDesign() {
         return {
           ...old,
           data: old.data.map((b: Booking) =>
-            b._id === id ? { ...b, travelDate } : b
+            b._id === id ? { ...b, travelDate } : b,
           ),
         };
       });
@@ -346,9 +346,9 @@ export default function ManageBookingDesign() {
         });
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-    },
+    // onSettled: () => {
+    //   queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    // },
     onSuccess: (res) => {
       const updatedBooking = res?.data;
       if (updatedBooking) {
@@ -357,7 +357,7 @@ export default function ManageBookingDesign() {
           return {
             ...old,
             data: old.data.map((b: Booking) =>
-              b._id === updatedBooking._id ? updatedBooking : b
+              b._id === updatedBooking._id ? updatedBooking : b,
             ),
           };
         });
@@ -521,10 +521,10 @@ export default function ManageBookingDesign() {
                               booking.bookingStatus === "confirmed"
                                 ? "bg-green-100 text-green-800"
                                 : booking.bookingStatus === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : booking.bookingStatus === "cancelled"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-gray-100 text-gray-800"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : booking.bookingStatus === "cancelled"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
                             }`}
                             onClick={(e) => e.stopPropagation()}
                             disabled={updateBookingStatus.isPending}
@@ -564,10 +564,10 @@ export default function ManageBookingDesign() {
                               booking.paymentStatus === "paid"
                                 ? "bg-green-100 text-green-800"
                                 : booking.paymentStatus === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : booking.paymentStatus === "failed"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-gray-100"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : booking.paymentStatus === "failed"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100"
                             }`}
                             onClick={(e) => e.stopPropagation()}
                             disabled={updatePaymentStatus.isPending}
@@ -654,7 +654,7 @@ export default function ManageBookingDesign() {
                   >
                     {p}
                   </button>
-                )
+                ),
               )}
 
               <button
@@ -736,7 +736,7 @@ export default function ManageBookingDesign() {
               <button
                 onClick={() => {
                   const input = document.getElementById(
-                    "paid-amount-input"
+                    "paid-amount-input",
                   ) as HTMLInputElement;
                   const amount = Number(input.value);
                   if (isNaN(amount) || amount < 0) {

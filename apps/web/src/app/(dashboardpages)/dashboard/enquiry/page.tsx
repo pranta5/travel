@@ -94,7 +94,8 @@ export default function ManageEnquiryDesign() {
     },
     staleTime: 0,
     // refetchInterval: 5000,
-    placeholderData: "previous",
+    placeholderData: (previousData) => previousData,
+
     refetchOnWindowFocus: true,
   });
 
@@ -278,12 +279,12 @@ export default function ManageEnquiryDesign() {
                             item.status === "pending"
                               ? "bg-yellow-100 text-yellow-800"
                               : item.status === "confirmed"
-                              ? "bg-green-100 text-green-800"
-                              : item.status === "solved"
-                              ? "bg-blue-100 text-blue-800"
-                              : item.status === "followup"
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-red-100 text-red-800"
+                                ? "bg-green-100 text-green-800"
+                                : item.status === "solved"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : item.status === "followup"
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-red-100 text-red-800"
                           }`}
                         >
                           <option value="pending">Pending</option>
@@ -384,7 +385,7 @@ export default function ManageEnquiryDesign() {
                   >
                     {p}
                   </button>
-                )
+                ),
               )}
 
               <button
